@@ -1,4 +1,8 @@
-from neat import activations
+
+import os
+
+import neat
+from neat import activations, Config, DefaultGenome
 from neat.nn import FeedForwardNetwork
 
 
@@ -44,6 +48,22 @@ def test_basic():
     assert result[0] == r.values[0]
 
 
+def add_node(g, config, new_node_id=None, bias=None, response=None, aggregation=None, activation=None):
+    if new_node_id is None:
+        new_node_id = config.get_new_node_key(g.nodes)
+    ng = g.create_node(config, new_node_id)
+    g.nodes[new_node_id] = ng
+    if bias is not None:
+        ng.bias = bias
+    if response is not None:
+        ng.response = response
+    if aggregation is not None:
+        ng.aggregation = aggregation
+    if activation is not None:
+        ng.activation = activation
+    return new_node_id, ng
+
+
 # TODO: Update this test for the current implementation.
 # def test_simple_nohidden():
 #     config_params = {
@@ -81,34 +101,87 @@ def test_basic():
 #     assert_almost_equal(v11[0], 0.0, 1e-3)
 
 
-# TODO: Update this test for the current implementation.
-# def test_simple_hidden():
-#     config = Config()
-#     config.genome_config.set_input_output_sizes(2, 1)
-#     g = DefaultGenome(0, config)
-#
-#     g.add_node(0, 0.0, 1.0, 'sum', 'identity')
-#     g.add_node(1, -0.5, 5.0, 'sum', 'sigmoid')
-#     g.add_node(2, -1.5, 5.0, 'sum', 'sigmoid')
-#     g.add_connection(-1, 1, 1.0, True)
-#     g.add_connection(-2, 2, 1.0, True)
-#     g.add_connection(1, 0, 1.0, True)
-#     g.add_connection(2, 0, -1.0, True)
-#     net = nn.create_feed_forward_phenotype(g, config)
-#
-#     v00 = net.serial_activate([0.0, 0.0])
-#     assert_almost_equal(v00[0], 0.195115, 1e-3)
-#
-#     v01 = net.serial_activate([0.0, 1.0])
-#     assert_almost_equal(v01[0], -0.593147, 1e-3)
-#
-#     v10 = net.serial_activate([1.0, 0.0])
-#     assert_almost_equal(v10[0], 0.806587, 1e-3)
-#
-#     v11 = net.serial_activate([1.0, 1.0])
-#     assert_almost_equal(v11[0], 0.018325, 1e-3)
+def test_simple_hidden():
+    # Get config path
+    local_dir = os.path.dirname(__file__)
+    config_path = os.path.join(local_dir, 'test_configuration2')
+
+    # Load configuration from file
+    config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
+                         neat.DefaultSpeciesSet, neat.DefaultStagnation, config_path)
+
+    # Construct test genome.
+    g = DefaultGenome(0)
+    g.configure_new(config.genome_config)
+    g.nodes.clear()
+    g.connections.clear()
+    # n0 = n1 - n2
+    # n1 = sigmoid(5*i1 - 0.5)
+    # n2 = sigmoid(5*i2 - 1.5)
+    add_node(g, config.genome_config, 0, 0.0, 1.0, 'sum', 'identity')
+    add_node(g, config.genome_config, 1, -0.5, 5.0, 'sum', 'sigmoid')
+    add_node(g, config.genome_config, 2, -1.5, 5.0, 'sum', 'sigmoid')
+    g.add_connection(config.genome_config, -1, 1, 1.0, True)
+    g.add_connection(config.genome_config, -2, 2, 1.0, True)
+    g.add_connection(config.genome_config, 1, 0, 1.0, True)
+    g.add_connection(config.genome_config, 2, 0, -1.0, True)
+    net = FeedForwardNetwork.create(g, config)
+
+    v00 = net.activate([0.0, 0.0])
+    assert_almost_equal(v00[0], 0.075305, 1e-3)
+
+    v01 = net.activate([0.0, 1.0])
+    assert_almost_equal(v01[0], -0.924141, 1e-3)
+
+    v10 = net.activate([1.0, 0.0])
+    assert_almost_equal(v10[0], 0.999447, 1e-3)
+
+    v11 = net.activate([1.0, 1.0])
+    assert_almost_equal(v11[0], 2.494080e-8, 1e-3)
+
+
+def test_dangling_input():
+    # Get config path
+    local_dir = os.path.dirname(__file__)
+    config_path = os.path.join(local_dir, 'test_configuration2')
+
+    # Load configuration from file
+    config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
+                         neat.DefaultSpeciesSet, neat.DefaultStagnation, config_path)
+
+    # Construct test genome.
+    g = DefaultGenome(0)
+    g.configure_new(config.genome_config)
+    g.nodes.clear()
+    g.connections.clear()
+    # n0 = n1 - n2
+    # n1 = sigmoid(-0.5)
+    # n2 = sigmoid(5*i2 - 1.5)
+    add_node(g, config.genome_config, 0, 0.0, 1.0, 'sum', 'identity')
+    add_node(g, config.genome_config, 1, -0.5, 5.0, 'sum', 'sigmoid')
+    add_node(g, config.genome_config, 2, -1.5, 5.0, 'sum', 'sigmoid')
+    # Node 1 has no inputs.
+    # g.add_connection(config.genome_config, -1, 1, 1.0, True)
+    g.add_connection(config.genome_config, -2, 2, 1.0, True)
+    g.add_connection(config.genome_config, 1, 0, 1.0, True)
+    g.add_connection(config.genome_config, 2, 0, -1.0, True)
+    net = FeedForwardNetwork.create(g, config)
+
+    v00 = net.activate([0.0, 0.0])
+    assert_almost_equal(v00[0], 0.075305, 1e-3)
+
+    v01 = net.activate([0.0, 1.0])
+    assert_almost_equal(v01[0], -0.924141, 1e-3)
+
+    v10 = net.activate([1.0, 0.0])
+    assert_almost_equal(v10[0], 0.075305, 1e-3)
+
+    v11 = net.activate([1.0, 1.0])
+    assert_almost_equal(v11[0], -0.924141, 1e-3)
 
 
 if __name__ == '__main__':
     test_unconnected()
     test_basic()
+    test_simple_hidden()
+    test_dangling_input()
