@@ -73,6 +73,12 @@ def feed_forward_layers(inputs, outputs, connections):
 
     layers = []
     s = set(inputs)
+    # First, find any nodes which do not have inputs.
+    has_input = set(b for (a, b) in connections)  # Get the set of all nodes with an incoming edge.
+    does_not_have_input = required - has_input  # Get required nodes that do NOT have an incoming edge.
+    if does_not_have_input:
+        layers.append(does_not_have_input)
+        s = s.union(does_not_have_input)
     while 1:
         # Find candidate nodes c for the next layer.  These nodes should connect
         # a node in s to a node not in s.
