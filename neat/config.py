@@ -117,6 +117,10 @@ class DefaultClassConfig(object):
         # pylint: disable=protected-access
         write_pretty_params(f, config, config._params)
 
+    def save(self, f):
+        # pylint: disable=protected-access
+        write_pretty_params(f, self, self._params)
+
 
 class Config(object):
     """A container for user-configurable parameters of NEAT."""
