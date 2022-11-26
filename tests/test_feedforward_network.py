@@ -158,7 +158,7 @@ def test_dangling_input():
     # n1 = sigmoid(-0.5)
     # n2 = sigmoid(5*i2 - 1.5)
     add_node(g, config.genome_config, 0, 0.0, 1.0, 'sum', 'identity')
-    add_node(g, config.genome_config, 1, -0.5, 5.0, 'sum', 'sigmoid')
+    add_node(g, config.genome_config, 1, -0.5, 5.0, 'max', 'sigmoid')
     add_node(g, config.genome_config, 2, -1.5, 5.0, 'sum', 'sigmoid')
     # Node 1 has no inputs.
     # g.add_connection(config.genome_config, -1, 1, 1.0, True)
@@ -167,6 +167,16 @@ def test_dangling_input():
     g.add_connection(config.genome_config, 2, 0, -1.0, True)
     net = FeedForwardNetwork.create(g, config)
 
+    # First, this network is invalid and should throw an error.
+    try:
+        net.activate([0.0, 0.0])
+        assert False, "Max aggregation on a node with no inputs should throw an error."
+    except ValueError as e:
+        assert str(e) == "max() arg is an empty sequence"
+
+    # Now change the network to be valid (replace "max" with "sum").
+    add_node(g, config.genome_config, 1, -0.5, 5.0, 'sum', 'sigmoid')
+    net = FeedForwardNetwork.create(g, config)
     v00 = net.activate([0.0, 0.0])
     assert_almost_equal(v00[0], 0.075305, 1e-3)
 
