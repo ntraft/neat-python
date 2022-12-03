@@ -18,7 +18,7 @@ class DefaultGenomeConfig(object):
                             'full_nodirect', 'full', 'full_direct',
                             'partial_nodirect', 'partial', 'partial_direct']
 
-    def __init__(self, params):
+    def __init__(self, params, extra_param_definitions=None):
         # Create full set of available activation functions.
         self.activation_defs = ActivationFunctionSet()
         # ditto for aggregation functions - name difference for backward compatibility
@@ -38,6 +38,8 @@ class DefaultGenomeConfig(object):
                         ConfigParameter('single_structural_mutation', bool, 'false'),
                         ConfigParameter('structural_mutation_surer', str, 'default'),
                         ConfigParameter('initial_connection', str, 'unconnected')]
+        if extra_param_definitions:
+            self._params.extend(extra_param_definitions)
 
         # Gather configuration data from the gene classes.
         self.node_gene_type = params['node_gene_type']
