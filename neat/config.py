@@ -27,7 +27,7 @@ class ConfigParameter(object):
             return config_parser.getfloat(section, self.name)
         if list == self.value_type:
             v = config_parser.get(section, self.name)
-            return v.split(" ")
+            return v.split()
         if str == self.value_type:
             return config_parser.get(section, self.name)
 
@@ -64,7 +64,7 @@ class ConfigParameter(object):
             if float == self.value_type:
                 return float(value)
             if list == self.value_type:
-                return value.split(" ")
+                return value.split()
         except Exception:
             raise RuntimeError(
                 f"Error interpreting config item '{self.name}' with value {value!r} and type {self.value_type}")
