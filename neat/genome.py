@@ -296,6 +296,16 @@ class DefaultGenome(object):
         # Mutate connection genes.
         for cg in self.connections.values():
             cg.mutate(config)
+        # Validate that all nodes have at least one active incoming connection.
+        for ni, ng in self.nodes.items():
+            in_conns = [cg for ci, cg in self.connections.items() if ci[1] == ni]
+            if not in_conns:
+                # This node has no incoming connections.
+                raise RuntimeError(f"Node {ni} does not have any incoming connections.")
+            if not any([cg.enabled for cg in in_conns]):
+                # All the incoming connections for this node are disabled. Randomly pick one to re-enable.
+                cg = choice(in_conns)
+                cg.enabled = True
 
         # Mutate node genes (bias, response, etc.).
         for ng in self.nodes.values():
@@ -368,6 +378,15 @@ class DefaultGenome(object):
         cg = self.create_connection(config, in_node, out_node)
         self.connections[cg.key] = cg
 
+    def okay_to_remove_connection(self, key):
+        out_node = key[1]
+        for k in self.connections.keys():
+            if k != key and k[1] == out_node:
+                # There is another connection feeding into this node, so we're okay to remove.
+                return True
+        # This is the only input to this node, so it can't be removed or disabled.
+        return False
+
     def mutate_delete_node(self, config):
         # Do nothing if there are no non-output nodes.
         available_nodes = [k for k in self.nodes if k not in config.output_keys]
@@ -382,6 +401,19 @@ class DefaultGenome(object):
                 connections_to_delete.add(v.key)
 
         for key in connections_to_delete:
+            if key[1] != del_key and not self.okay_to_remove_connection(key):
+                # We are about to delete the last incoming connection to some other node. It needs to be replaced with
+                # another connection. Randomly choose one of the predecessor nodes and create a new connection which
+                # skips the deleted node.
+                from_node = choice([ni for ni, _ in connections_to_delete if ni != del_key])
+                to_node = key[1]
+                # We do not need to check for cycles b/c we are just bridging a connection that already existed.
+                # WARNING: This could in theory connect two output nodes, something which is disallowed in
+                # `mutate_add_connection()`. But I'm not sure why this is disallowed anyway, and it should be rare.
+                cg = self.create_connection(config, from_node, to_node)
+                cg.enabled = True
+                self.connections[cg.key] = cg
+
             del self.connections[key]
 
         del self.nodes[del_key]
@@ -391,7 +423,8 @@ class DefaultGenome(object):
     def mutate_delete_connection(self):
         if self.connections:
             key = choice(list(self.connections.keys()))
-            del self.connections[key]
+            if self.okay_to_remove_connection(key):
+                del self.connections[key]
 
     def distance(self, other, config):
         """
